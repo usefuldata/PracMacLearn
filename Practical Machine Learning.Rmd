@@ -1,0 +1,109 @@
+---
+title: "Practical_Machine_Learning"
+author: "Utpal Datta"
+date: "October 25, 2015"
+output: html_document
+---
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+#Data 
+
+The training data for this project are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## Step 1: Load Data
+- First we'll download the csv files and read them into data frames.
+```{r}
+library(caret)
+library(randomForest)
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv","pml-testing.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","pml-training.csv")
+train <- read.csv("pml-training.csv",na.strings = c("", "NA", "#DIV/0!"))
+test <- read.csv("pml-testing.csv",na.strings = c("", "NA", "#DIV/0!"))
+```
+
+## Step 2: Exploratory Analysis
+- Next we'll perform some exploratory analysis:
+
+```{r}
+dim(train)
+table(train$classe)
+head(train[,1:11])
+dim(test)
+head(test[,1:11])
+```
+
+## Step 3: Pre Process Training Data
+- Now we'll select and reject necessary variables with which we can fit our model. 
+- We'll firt reject descreiptive fields which are first 6 fields in the train dataset. 
+- Then we'll reject the variables with nearly 0 variation (small variation, which won't impact the result much)
+- Finally we'll reject fields wirh 40% or more NAs.
+
+```{r}
+train<- train[,7:dim(train)[2]][,-nearZeroVar(train)]
+cnt <- sapply(train, function(x) {
+    sum(!(is.na(x) | x == ""))
+})
+nulvar <- names(cnt[cnt < 0.6 * length(train$classe)])
+train <- train[, !names(train) %in% nulvar]
+```
+
+## Step 4: Splitting data
+- Dividing Train data into Train Set and Validation Set
+- Used 80% data as Training set and 20% as Test/Validation set
+
+```{r}
+set.seed(777)
+trainset <- createDataPartition(train$classe, p = 0.8, list = FALSE)
+trainst <- train[trainset, ]
+testst <- train[-trainset, ]
+```
+
+## Step 5: Model Training
+- Using Random Forest model to classe Field of Training Set
+
+```{r}
+rfMdl <- randomForest(classe ~ ., data = trainst, importance = TRUE, ntrees = 10)
+```
+
+## Step 6: Model Validation
+- Validating Model using the validation set
+
+```{r}
+pvalidation <- predict(rfMdl, testst)
+print(confusionMatrix(pvalidation, testst$classe))
+```
+- With 99.87% Cross Validation accuracy, we can conclude that our model is performing good. 
+- It can be applied to the Prediction Set given to get theprediction for the 20 Records.
+
+
+## Step 7: Predicting Test Set and Dumping
+- Applying the model to predict the answer given for the 20 sets of Test Records.
+- Also, splitting that to 20 files to submit the "Submission" part.
+
+```{r}
+ptest <- predict(rfMdl, test)
+ptest
+
+answers <- as.vector(ptest)
+
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)
+
+```
+
+# .................. Thank You!!! .....................
